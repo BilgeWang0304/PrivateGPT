@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 # Initialize Ollama
-llm = Ollama(model="llama3.2")
+llm = Ollama(model="llama3.2", temperature=0.3)
 
 # Store all conversations
 conversations = {}
@@ -64,7 +64,7 @@ async def chat(request: ChatRequest):
         chat_id = request.chat_id or create_new_conversation()
         conversation = conversations[chat_id]["conversation"]
 
-        response = conversation.predict(input=request.message)
+        response = await conversation.apredict(input=request.message)
 
         if conversations[chat_id]["title"] == "New Chat":
             conversations[chat_id]["title"] = request.message[:30]
