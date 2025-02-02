@@ -1,6 +1,14 @@
 fastapi
+pydantic
 uvicorn
-ollama
 langchain
 langchain-ollama
-
+langchain-chroma
+langchain-community
+langchain-core
+langchain_text_splitters
+unstructured
+fastembed
+pdfplumber
+chromadb
+fitz
