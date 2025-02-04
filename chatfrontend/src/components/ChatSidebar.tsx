@@ -10,8 +10,6 @@ import {
   DropdownMenuShortcut
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button"
-import { cn } from "../lib/utils";
-import { AiOutlineWechatWork } from "react-icons/ai";
 
 interface Chat {
   chat_id: string;

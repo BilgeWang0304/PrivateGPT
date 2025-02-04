@@ -2,17 +2,25 @@ import os
 import logging
 import pymupdf
 from langchain.schema import Document
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
-from app.utils import create_vector_db, create_retriever, create_chain, get_llm
+from fastapi import APIRouter, HTTPException, File, UploadFile
+from app.utils import create_vector_db, get_llm
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.models import vector_db_state
+from app.globals import chat_file_mapping
+import aiofiles
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 
 router = APIRouter()
-
+process_executor = ThreadPoolExecutor(max_workers=3)
 llm = get_llm()
 UPLOAD_FOLDER = "./uploads"
+VECTOR_STORE_DIR = "./vector_store"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 shared_vector_db = None
+os.makedirs(VECTOR_STORE_DIR, exist_ok=True)
+EMBEDDING_MODEL = "nomic-embed-text"
 
 def extract_text_pymupdf(pdf_path):
     """Extract text from a PDF using PyMuPDF (fitz)."""
@@ -22,52 +30,67 @@ def extract_text_pymupdf(pdf_path):
         raise ValueError("No text found in the PDF.")
     return text
 
-@router.post("/")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload a PDF file and process it into the vector database."""
-    global shared_vector_db
+async def process_pdf(chat_id: str, file_path: str, filename: str):
+    """Process PDF with thread pooling for CPU-bound tasks"""
     try:
-        # Save the uploaded file
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        with open(file_path, "wb") as f:
-            f.write(await file.read())
-
-        # Load and split the PDF
-        text = extract_text_pymupdf(file_path)
+        # Run blocking operations in thread pool
+        text = await asyncio.get_event_loop().run_in_executor(
+            process_executor,
+            lambda: extract_text_pymupdf(file_path)
+        )
         print("PDF loaded successfully.")
 
-        document = Document(page_content=text, metadata={"source": file.filename})
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=300)
-        chunks = text_splitter.split_documents([document])
+        document = await asyncio.get_event_loop().run_in_executor(
+            process_executor,
+            lambda: Document(page_content=text, metadata={"source": filename})
+        )
+
+        chunks = await asyncio.get_event_loop().run_in_executor(
+            process_executor,
+            lambda: RecursiveCharacterTextSplitter(
+                chunk_size=1200, 
+                chunk_overlap=200
+            ).split_documents([document])
+        )
         print("PDF split into chunks.")
 
-        # Create the vector database
-        shared_vector_db = create_vector_db(chunks)
-        return {"message": "File uploaded and processed successfully."}
+        # Create vector DB
+        vector_db = await asyncio.get_event_loop().run_in_executor(
+            process_executor,
+            lambda: create_vector_db(chunks, chat_id=chat_id)
+        )
+
+        # Update state
+        vector_db_state.set_vector_db(vector_db)
+        chat_file_mapping.setdefault(chat_id, []).append(file_path)
+
+        return True
     except Exception as e:
-        logging.error(f"Error processing file: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process the file.")
+        logging.error(f"Processing error: {e}")
+        raise
 
-@router.post("/query/")
-async def query_file(question: str = Form(...)):
-    """Query the vector database."""
-    global shared_vector_db
-    if shared_vector_db is None:
-        raise HTTPException(status_code=400, detail="No file has been uploaded.")
-
+@router.post("/{chat_id}")
+async def upload_file(chat_id: str, file: UploadFile = File(...)):
+    """Upload endpoint with guaranteed completion before response"""
     try:
-        retriever = create_retriever(shared_vector_db)
-        chain = create_chain(retriever, llm)
+        # Create upload directory
+        chat_upload_dir = os.path.join(UPLOAD_FOLDER, chat_id)
+        os.makedirs(chat_upload_dir, exist_ok=True)
+        file_path = os.path.join(chat_upload_dir, file.filename)
 
-        # Run the query
-        relevant_docs = retriever.invoke(question)
-        if not relevant_docs:
-            return {"response": "No relevant data found in the document."}
-        document_text = "\n\n".join([doc.page_content for doc in relevant_docs])
-        print (f"Retrieved {len(relevant_docs)} chunks for query.")
-        query_with_context = f"Context: {document_text}\n\nQuestion: {question}"
-        response = chain.invoke({"question": query_with_context})
-        return {"response": response}
+        # Async file save
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(await file.read())
+
+        # Process with async wrapper
+        success = await process_pdf(chat_id, file_path, file.filename)
+        
+        if not success:
+            raise HTTPException(500, "File processing failed")
+
+        return {"message": f"File processed successfully."}
+
     except Exception as e:
-        logging.error(f"Error querying file: {e}")
-        raise HTTPException(status_code=500, detail="Failed to query the file.")
+        logging.error(f"Upload error: {e}")
+        raise HTTPException(500, "File processing failed") from e
+

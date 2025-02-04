@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from langchain_chroma import Chroma
+
 
 class ChatRequest(BaseModel):
     chat_id: str | None
@@ -22,3 +24,15 @@ class ChatDetail(BaseModel):
 
 class RenameChatRequest(BaseModel):
     title: str
+
+class VectorDBState:
+    def __init__(self):
+        self.vector_db = None
+    
+    def set_vector_db(self, db):
+        self.vector_db = db
+    
+    def get_vector_db(self):
+        return self.vector_db
+
+vector_db_state = VectorDBState()

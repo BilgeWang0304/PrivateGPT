@@ -22,7 +22,12 @@ async def get_chat_history(chat_id: str):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT role, content FROM messages WHERE chat_id = ? ORDER BY created_at', (chat_id,))
+        cursor.execute('''
+            SELECT role, content 
+            FROM messages 
+            WHERE chat_id = ? 
+            ORDER BY created_at ASC
+        ''', (chat_id,))
         messages = cursor.fetchall()
         conn.close()
         
@@ -31,7 +36,7 @@ async def get_chat_history(chat_id: str):
         
         # Properly format the messages before returning
         formatted_messages = [{"role": role, "content": content} for role, content in messages]
-        print(f"Fetched messages for chat_id {chat_id}: {formatted_messages}") 
+        print(f"Fetched messages for chat_id {chat_id}.") 
         return {"chat_id": chat_id, "messages": formatted_messages}
     except Exception as e:
         print("Error fetching chat history:", str(e))

@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import ChatSidebar from "./ChatSidebar";
 import MessageBubble from "./MessageBubble";
-import { sendMessage, sendMessageStream, startNewChat, uploadFile, fetchChatHistoryById, fetchChatHistory, queryFile  } from "../api/chatAPI";
+import { sendMessage, sendMessageStream, startNewChat, uploadFile, fetchChatHistoryById, fetchChatHistory  } from "../api/chatAPI";
 import { TypingIndicator } from "./typingIndicator";
 import { FaFileAlt, FaTimes } from "react-icons/fa"; 
-import { AiOutlineWechatWork } from "react-icons/ai";
 
 interface Message {
   role: "user" | "bot";
@@ -16,6 +15,10 @@ interface Chat {
   title: string;
 }
 
+interface ChatInterfaceState {
+  uploadedFiles: { [key: string]: string | null }; 
+}
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -24,7 +27,10 @@ const ChatInterface: React.FC = () => {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: string | null }>(() => {
+    const savedFiles = localStorage.getItem('uploadedFiles');
+    return savedFiles ? JSON.parse(savedFiles) : {};
+  });
 
   useEffect(() => {
     loadChatHistory();
@@ -39,13 +45,17 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    localStorage.setItem('uploadedFiles', JSON.stringify(uploadedFiles));
+  }, [uploadedFiles]);
+
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setUploadedFile(null); // Reset file after sending
+    setUploadedFile(null); 
     setUploadedFileName(null);
 
     const textarea = document.querySelector("textarea");
@@ -53,49 +63,49 @@ const ChatInterface: React.FC = () => {
         textarea.style.height = "auto";
       }
 
-    try {
-      setIsTyping(true);
+      try {
+        setIsTyping(true);
+        
+        // Add a temporary bot response placeholder
+        setMessages((prev) => [...prev, { role: "bot", content: "" }]);
 
-      const botMessage: Message = {
-        role: "bot",
-        content: "",
-      };
-      setMessages((prev) => [...prev, botMessage]);
-
-      if (!uploadedFile) {
-        // If no file uploaded, use normal chatbot logic
-        const responseStream = await sendMessageStream(currentChatId, input);
         let fullResponse = "";
-        for await (const chunk of responseStream) {
-          fullResponse += chunk; // Append the chunk to the accumulated response
-          console.log("Received chunk:", chunk); // Debug: Log each chunk
 
-          setMessages((prev) =>
+        // **Use streaming for both normal and file-based queries**
+        console.log(`Sending query ${uploadedFile ? "with file" : "without file"}...`);
+        const responseStream = await sendMessageStream(currentChatId, input);
+
+        for await (const chunk of responseStream) {
+            fullResponse += chunk; // Append chunks as they arrive
+            console.log("Received chunk:", chunk);
+
+            // Update the last bot message in real-time
+            setMessages((prev) =>
+                prev.map((msg, idx) =>
+                    idx === prev.length - 1
+                        ? { ...msg, content: fullResponse }
+                        : msg
+                )
+            );
+        }
+
+        // Final update to the last bot message
+        setMessages((prev) =>
             prev.map((msg, idx) =>
-              idx === prev.length - 1
-                ? { ...msg, content: fullResponse }
-                : msg
+                idx === prev.length - 1 ? { ...msg, content: fullResponse } : msg
             )
-          );
-        }
+        );
+
+        // Ensure the chatbot correctly associates the chat session with the file
         if (!currentChatId) {
-          const { chat_id } = await sendMessage(currentChatId, input);
-          setCurrentChatId(chat_id);
-          await loadChatHistory();
+            const { chat_id } = await sendMessage(currentChatId, input);
+            setCurrentChatId(chat_id);
+            await loadChatHistory();
         }
-      } else {
-        // If file is uploaded, treat it as a query to the uploaded file
-        const response = await sendMessage(currentChatId, input); // Reuse same sendMessage function
-        const botMessage: Message = {
-          role: "bot",
-          content: response.response.result,
-        };
-        setMessages((prev) => [...prev, botMessage]);
-      }
     } catch (error) {
-      console.error("Error sending message:", error);
+        console.error("Error sending message:", error);
     } finally {
-      setIsTyping(false);
+        setIsTyping(false);
     }
   };
 
@@ -114,15 +124,30 @@ const ChatInterface: React.FC = () => {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
-
     const file = event.target.files[0];
-    setUploadedFile(file); 
-    setUploadedFileName(file.name);
+    const fileName = file.name
+
+    if (!currentChatId) {
+      alert("Please start a new chat before uploading a file.");
+      return;
+    }
+    setUploadedFiles(prev => ({
+      ...prev,
+      [currentChatId]: fileName
+    }));
+
     try {
-      const message = await uploadFile(file);
-      alert(message); 
+      const message = await uploadFile(currentChatId, file);
+      alert(message);
     } catch (error) {
       console.error("Error uploading file:", error);
+      setUploadedFiles(prev => ({
+        ...prev,
+        [currentChatId]: null
+      }));
+      alert("File upload failed. Please try again.");
+    } finally {
+      event.target.value = '';
     }
   };
 
@@ -143,6 +168,12 @@ const ChatInterface: React.FC = () => {
 
   const handleChatDeleted = (chatId: string) => {
     setChatHistory((prev) => prev.filter((chat) => chat.chat_id !== chatId));
+    setUploadedFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[chatId];
+      return newFiles;
+    });
+
     if (currentChatId === chatId) {
       setCurrentChatId(null);
       setMessages([]);
@@ -159,7 +190,7 @@ const ChatInterface: React.FC = () => {
         currentChatId={currentChatId}
       />
 
-      <div className="flex-1 flex flex-col bg-gray-800 text-gray-100">
+      <div className="flex-1 flex flex-col  bg-gray-800 text-gray-100">
         <div className="flex-1 overflow-y-auto p-8">
         {messages.map((msg, index) => (
             <MessageBubble key={index} role={msg.role} content={msg.content} />
@@ -168,11 +199,17 @@ const ChatInterface: React.FC = () => {
             <MessageBubble role="bot" content={<TypingIndicator />} />
           )}
         </div>
-        {uploadedFile && (
+        {currentChatId && uploadedFiles[currentChatId] && (
           <div className="p-2 bg-gray-700 text-gray-300 flex items-center space-x-2 border-t border-gray-600">
             <FaFileAlt size={18} />
-            <span>{uploadedFileName}</span>
-            <button onClick={handleRemoveFile} className="text-red-500 hover:text-red-700">
+            <span>{uploadedFiles[currentChatId]}</span>
+            <button 
+              onClick={() => setUploadedFiles(prev => ({
+                ...prev,
+                [currentChatId!]: null
+              }))}  
+              className="text-red-500 hover:text-red-700"
+            >
               <FaTimes size={16} />
             </button>
           </div>
@@ -187,7 +224,7 @@ const ChatInterface: React.FC = () => {
             />
           </label>
           <textarea
-            className="flex-1 p-2 bg-gray-800 text-gray-200 rounded-lg border border-gray-700 resize-none shadow-sm"
+            className="text-lg flex-1 p-2 bg-gray-800 text-gray-200 rounded-lg border border-gray-700 resize-none shadow-sm"
             placeholder="Type a message..."
             value={input}
             rows={1}

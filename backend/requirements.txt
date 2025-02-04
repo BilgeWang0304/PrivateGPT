@@ -12,3 +12,6 @@ fastembed
 pdfplumber
 chromadb
 fitz
+pymupdf
+python-multipart
+aiofiles

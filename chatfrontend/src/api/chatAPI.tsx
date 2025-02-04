@@ -134,12 +134,12 @@ export const fetchChatHistoryById = async (chatId: string): Promise<Message[]> =
   }
 };
 
-export const uploadFile = async (file: File): Promise<string> => {
+export const uploadFile = async (chat_id: string, file: File): Promise<string> => {
   try {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${BASE_URL}/upload/`, {
+    const response = await fetch(`${BASE_URL}/upload/${chat_id}`, {
       method: "POST",
       body: formData,
     });
@@ -155,25 +155,6 @@ export const uploadFile = async (file: File): Promise<string> => {
   }
 };
 
-export const queryFile = async (question: string): Promise<string> => {
-  try {
-    const response = await fetch(`${BASE_URL}/upload/query/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to query the backend.");
-    }
-
-    const data = await response.json();
-    return data.response || "No response received.";
-  } catch (error) {
-    console.error("Query error:", error);
-    return "Failed to get a response.";
-  }
-};
 
 export const deleteChat = async (chatId: string): Promise<void> => {
   try {

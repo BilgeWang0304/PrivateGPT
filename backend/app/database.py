@@ -20,6 +20,7 @@ def init_db():
                 chat_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(chat_id) REFERENCES chats(chat_id)
             )
         """)
@@ -41,17 +42,20 @@ def save_message(chat_id: str, role: str, content: str):
     """Save a message to the database."""
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM messages WHERE chat_id = ? AND role = ?",
-            (chat_id, role),
-        )
 
         cursor.execute(
-            "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
+            "SELECT COUNT(*) FROM messages WHERE chat_id = ? AND role = ? AND content = ?",
             (chat_id, role, content),
         )
+        count = cursor.fetchone()[0]
 
-        print(f"Saved new message for chat_id {chat_id}: role={role}, content={content}") 
+        if count == 0:  
+            cursor.execute(
+                "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
+                (chat_id, role, content),
+            )
+            print(f"✅ Saved new message for chat_id {chat_id}: role={role}, content={content}")
+
         conn.commit()
 
 def fetch_chat_messages(chat_id: str) -> List[Dict]:
