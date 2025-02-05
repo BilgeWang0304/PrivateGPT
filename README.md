@@ -106,5 +106,7 @@ File "backend/utils.py", line 20:
 
 ```python
 # For temperature, the higher the more diverse and creative
+# For model,deepseek-r1 is recommended to deal with logic problems, the "Think Phase" shows the processes of generating responses. If you want text analysis, qwen2.5 is recommended.
+# Feel free to use size 7b if your computer has 12GB+ VRAM and 16GB+ RAM
 def get_llm(model="qwen2.5:1.5b", temperature=0.5):
 ```
