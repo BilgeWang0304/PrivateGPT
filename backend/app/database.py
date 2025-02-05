@@ -82,3 +82,13 @@ def delete_all_data():
         conn.commit()
         print("All data has been deleted from the database.")
 
+if __name__ == "__main__":
+    init_db()
+else:
+    # Auto-initialize when module is imported
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chats'")
+        if not cursor.fetchone():
+            init_db()
+
