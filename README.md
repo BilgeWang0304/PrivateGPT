@@ -7,7 +7,7 @@
 
 An internal, offline-capable chatbot solution combining:
 
-- **Backend**: Python FastAPI for AI processing and API endpoints
+- **Backend**: Python FastAPI for AI processing and endpoints
 
 - **Frontend**: React.js for modern user interface
 
