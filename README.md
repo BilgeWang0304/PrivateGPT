@@ -110,3 +110,10 @@ File "backend/utils.py", line 20:
 # Feel free to use size 7b if your computer has 12GB+ VRAM and 16GB+ RAM
 def get_llm(model="qwen2.5:1.5b", temperature=0.5):
 ```
+
+File "backend/routes/file_routes.py", line 16: 
+
+```python
+# Increase the max_workers if your computer can run more threads smoothly at the same time
+process_executor = ThreadPoolExecutor(max_workers=3)
+```
