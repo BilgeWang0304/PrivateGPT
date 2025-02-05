@@ -61,7 +61,23 @@ Node.js 16+
 
 Ollama service running locally
 
-### 1. Backend Setup
+### 1. Ollama Setup
+
+From https://ollama.com/ install Ollama.
+
+After installation, open the terminal to install required LLMs.
+
+```bash
+# List Available Models
+
+Ollama list
+
+# Install LLM
+
+ollama run <name of LLM> # Find the ingormation of models in https://ollama.com/search
+```
+
+### 2. Backend Setup
 ```bash
 # Clone repository
 git clone https://github.com/BilgeWang0304/PrivateGPT.git
@@ -71,19 +87,15 @@ cd PrivateGPT/backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
+# Run the chatbot on localhoset
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 ```bash
 cd PrivateGPT/frontend
 npm install  # Install dependencies
 npm start  # Run the frontend
 ```
-
-### 3. Ollama Setup
-
-From https://ollama.com/ install Ollama.
-
-After installation, open the terminal to install required LLMs.
-
