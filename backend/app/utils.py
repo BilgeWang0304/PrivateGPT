@@ -8,7 +8,6 @@ from langchain_core.runnables import RunnableWithMessageHistory, RunnableLambda
 from langchain.schema.messages import SystemMessage, HumanMessage, AIMessage
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from app.database import create_chat, save_message, fetch_chat_messages, fetch_all_chats
 from typing import List, Dict
 from langchain.retrievers.multi_query import MultiQueryRetriever

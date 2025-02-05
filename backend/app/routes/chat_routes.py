@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from app.models import ChatRequest, ChatResponse, ChatSummary, ChatDetail
 from app.utils import create_retriever, create_chain, create_new_conversation, get_llm, save_conversations, load_conversations
-from langchain.chains import RetrievalQA
 from app.database import save_message, get_db_connection
 import asyncio
 from langchain_chroma import Chroma

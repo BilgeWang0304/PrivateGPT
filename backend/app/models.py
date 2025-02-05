@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from langchain_chroma import Chroma
+
 
 
 class ChatRequest(BaseModel):

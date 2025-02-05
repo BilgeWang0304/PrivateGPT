@@ -7,11 +7,9 @@ langchain-chroma
 langchain-community
 langchain-core
 langchain_text_splitters
-unstructured
 fastembed
 pdfplumber
 chromadb
-fitz
 pymupdf
 python-multipart
 aiofiles
