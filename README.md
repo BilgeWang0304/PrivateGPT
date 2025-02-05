@@ -99,3 +99,12 @@ cd PrivateGPT/frontend
 npm install  # Install dependencies
 npm start  # Run the frontend
 ```
+
+### 4. Configuration of LLM
+
+File "backend/utils.py", line 20: 
+
+```python
+# For temperature, the higher the more diverse and creative
+def get_llm(model="qwen2.5:1.5b", temperature=0.5):
+```
