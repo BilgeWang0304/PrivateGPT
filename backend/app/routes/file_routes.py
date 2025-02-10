@@ -2,6 +2,7 @@ import os
 import logging
 import pymupdf
 from langchain.schema import Document
+from docx import Document as DocxDocument
 from fastapi import APIRouter, HTTPException, File, UploadFile
 from app.utils import create_vector_db, get_llm
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -10,10 +11,22 @@ from app.globals import chat_file_mapping
 import aiofiles
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-
+import pandas as pd
+import magic
 
 router = APIRouter()
-process_executor = ThreadPoolExecutor(max_workers=3)
+process_executor = ThreadPoolExecutor(max_workers=4)
+SUPPORTED_TYPES = {
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'text/csv': 'csv',
+    'application/msword': 'doc',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml': 'xlsx',
+}
+
 llm = get_llm()
 UPLOAD_FOLDER = "./uploads"
 VECTOR_STORE_DIR = "./vector_store"
@@ -30,21 +43,88 @@ def extract_text_pymupdf(pdf_path):
         raise ValueError("No text found in the PDF.")
     return text
 
-async def process_pdf(chat_id: str, file_path: str, filename: str):
-    """Process PDF with thread pooling for CPU-bound tasks"""
+async def detect_file_type(file_path: str):
+    """Detect file type using python-magic"""
     try:
-        # Run blocking operations in thread pool
-        text = await asyncio.get_event_loop().run_in_executor(
+        mime = magic.Magic(mime=True)
+        detected_type = mime.from_file(file_path)
+        file_type = SUPPORTED_TYPES.get(detected_type, 'unknown')
+        
+        # Fallback to file extension if MIME type fails
+        if file_type == 'unknown':
+            ext = os.path.splitext(file_path)[1].lower()
+            extension_map = {
+                '.docx': 'docx',
+                '.xlsx': 'xlsx',
+                '.xls': 'xls',
+                '.csv': 'csv',
+                '.pdf': 'pdf'
+            }
+            file_type = extension_map.get(ext, 'unknown')
+            
+        print(f"Detected type: {detected_type} -> {file_type}")  # Debug log
+        return file_type
+        
+    except Exception as e:
+        logging.error(f"Type detection error: {str(e)}")
+        return 'unknown'
+
+async def extract_text(file_path: str, file_type: str):
+    """Unified text extraction for different file types"""
+    if file_type == 'pdf':
+        return await asyncio.get_event_loop().run_in_executor(
             process_executor,
             lambda: extract_text_pymupdf(file_path)
         )
-        print("PDF loaded successfully.")
+    elif file_type == 'docx':
+        return await asyncio.get_event_loop().run_in_executor(
+            process_executor,
+            lambda: '\n'.join([p.text for p in DocxDocument(file_path).paragraphs])
+        )
+    elif file_type in ('xlsx', 'xls'):
+        return await process_excel(file_path, file_type)
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
 
+async def process_excel(file_path: str, file_type: str):
+    """Dedicated Excel processor"""
+    return await asyncio.get_event_loop().run_in_executor(
+        process_executor,
+        lambda: pd_read_excel(file_path, file_type)
+    )
+
+def pd_read_excel(file_path: str, file_type: str):
+    """Excel-specific text conversion"""
+    text = []
+    try:
+        xls = pd.ExcelFile(file_path)
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name)
+            text.append(f"\n\nSheet: {sheet_name}\n{df.to_string()}")
+        return '\n'.join(text)
+    except Exception as e:
+        raise ValueError(f"Excel processing failed: {str(e)}")
+
+async def process_file(chat_id: str, file_path: str, filename: str):
+    """Process files for a chat session, aggregating documents"""
+    try:
+        existing_files = chat_file_mapping.get(chat_id, [])
+        # Detect file type
+        file_type = await detect_file_type(file_path)
+        if file_type == 'unknown':
+            print(f"Unsupported file: {filename}")
+            raise ValueError("Unsupported file format")
+
+        # Extract text
+        text = await extract_text(file_path, file_type)
+        print(f"File content extracted ({file_type.upper()})")
+
+        # Create document and split
         document = await asyncio.get_event_loop().run_in_executor(
             process_executor,
             lambda: Document(page_content=text, metadata={"source": filename})
         )
-
+        
         chunks = await asyncio.get_event_loop().run_in_executor(
             process_executor,
             lambda: RecursiveCharacterTextSplitter(
@@ -52,7 +132,7 @@ async def process_pdf(chat_id: str, file_path: str, filename: str):
                 chunk_overlap=200
             ).split_documents([document])
         )
-        print("PDF split into chunks.")
+        print(f"Split into {len(chunks)} chunks")
 
         # Create vector DB
         vector_db = await asyncio.get_event_loop().run_in_executor(
@@ -83,7 +163,7 @@ async def upload_file(chat_id: str, file: UploadFile = File(...)):
             await f.write(await file.read())
 
         # Process with async wrapper
-        success = await process_pdf(chat_id, file_path, file.filename)
+        success = await process_file(chat_id, file_path, file.filename)
         
         if not success:
             raise HTTPException(500, "File processing failed")
@@ -93,4 +173,3 @@ async def upload_file(chat_id: str, file: UploadFile = File(...)):
     except Exception as e:
         logging.error(f"Upload error: {e}")
         raise HTTPException(500, "File processing failed") from e
-

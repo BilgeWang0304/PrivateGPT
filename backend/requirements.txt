@@ -13,3 +13,7 @@ chromadb
 pymupdf
 python-multipart
 aiofiles
+python-docx
+pandas
+openpyxl
+xlrd

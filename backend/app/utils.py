@@ -58,22 +58,37 @@ def create_vector_db(chunks=None, chat_id=None):
         raise ValueError("chat_id is required to create a vector DB")
     
     vector_store_path = os.path.join(VECTOR_STORE_DIR, chat_id)
+    embedding = OllamaEmbeddings(model=EMBEDDING_MODEL)
 
     if chunks:
-        vector_db = Chroma.from_documents(
-            documents=chunks,
-            embedding=OllamaEmbeddings(model=EMBEDDING_MODEL),
-            persist_directory=vector_store_path,
-        )
-        print(f"Stored {len(chunks)} document chunks for chat_id {chat_id}.")
+        # Check if vector store exists
+        if os.path.exists(vector_store_path):
+            # Load existing collection and add new chunks
+            vector_db = Chroma(
+                persist_directory=vector_store_path,
+                embedding_function=embedding,
+                collection_name=chat_id  # Match existing collection
+            )
+            vector_db.add_documents(chunks)
+            print(f"Added {len(chunks)} chunks to existing vector DB for chat {chat_id}")
+        else:
+            # Create new persistent collection
+            vector_db = Chroma.from_documents(
+                documents=chunks,
+                embedding=embedding,
+                persist_directory=vector_store_path,
+                collection_name=chat_id
+            )
+            print(f"Created new vector DB with {len(chunks)} chunks for chat {chat_id}")
+        return vector_db
     else:
-        # Load an existing vector database
+        # Load existing database
         return Chroma(
             persist_directory=vector_store_path,
-            embedding_function=OllamaEmbeddings(model=EMBEDDING_MODEL),  # Corrected parameter
+            embedding_function=embedding,
+            collection_name=chat_id
         )
-    return vector_db
-
+    
 def create_chain(retriever, llm):
     """Create a RAG (Retrieve-then-Generate) chain."""
     template = """Answer the question based on the following context:

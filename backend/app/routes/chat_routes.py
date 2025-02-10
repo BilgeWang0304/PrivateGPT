@@ -31,7 +31,8 @@ def get_vector_db(chat_id):
         try:
             return Chroma(
                 persist_directory=vector_store_path,
-                embedding_function=OllamaEmbeddings(model=EMBEDDING_MODEL)
+                embedding_function=OllamaEmbeddings(model=EMBEDDING_MODEL),
+                collection_name=chat_id  # Load collection by chat_id
             )
         except Exception as e:
             print(f"Error loading vector DB: {str(e)}")

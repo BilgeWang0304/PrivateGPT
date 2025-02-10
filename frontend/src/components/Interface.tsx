@@ -3,7 +3,7 @@ import ChatSidebar from "./ChatSidebar";
 import MessageBubble from "./MessageBubble";
 import { sendMessage, sendMessageStream, startNewChat, uploadFile, fetchChatHistoryById, fetchChatHistory  } from "../api/chatAPI";
 import { TypingIndicator } from "./typingIndicator";
-import { FaFileAlt, FaTimes } from "react-icons/fa"; 
+import { FaFileAlt, FaTimes, FaCheck } from "react-icons/fa"; 
 
 interface Message {
   role: "user" | "bot";
@@ -19,6 +19,37 @@ interface ChatInterfaceState {
   uploadedFiles: { [key: string]: string | null }; 
 }
 
+const ProgressCircle = ({ progress, isDone }: { progress: number; isDone: boolean }) => (
+  <div className="relative w-6 h-6 ml-2">
+    <svg className="w-full h-full transform -rotate-90">
+      <circle
+        cx="50%"
+        cy="50%"
+        r="8"
+        fill="none"
+        className="stroke-current text-gray-400"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="50%"
+        cy="50%"
+        r="8"
+        fill="none"
+        className={`stroke-current ${isDone ? 'text-green-500' : 'text-blue-500'}`}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={`${2 * Math.PI * 8}`}
+        strokeDashoffset={`${2 * Math.PI * 8 * (1 - progress)}`}
+        style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+      />
+    </svg>
+    {isDone && (
+      <FaCheck className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-green-500 text-xs" />
+    )}
+  </div>
+);
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -27,10 +58,17 @@ const ChatInterface: React.FC = () => {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: string | null }>(() => {
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: string[] }>(() => {
     const savedFiles = localStorage.getItem('uploadedFiles');
     return savedFiles ? JSON.parse(savedFiles) : {};
   });
+  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
+  const [uploadProgress, setUploadProgress] = useState<{ 
+    [key: string]: { 
+      progress: number; 
+      status: 'uploading' | 'done' | 'error' 
+    } 
+  }>({});
 
   useEffect(() => {
     loadChatHistory();
@@ -123,29 +161,60 @@ const ChatInterface: React.FC = () => {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
+    if (!event.target.files?.length) return;
     const file = event.target.files[0];
-    const fileName = file.name
-
+    const fileName = file.name;
+  
     if (!currentChatId) {
       alert("Please start a new chat before uploading a file.");
       return;
     }
+  
+    // Immediately show file with loading state
     setUploadedFiles(prev => ({
       ...prev,
-      [currentChatId]: fileName
+      [currentChatId]: [...(prev[currentChatId] || []), fileName]
     }));
-
+    
+    setUploadProgress(prev => ({
+      ...prev,
+      [fileName]: { progress: 0, status: 'uploading' }
+    }));
+  
     try {
-      const message = await uploadFile(currentChatId, file);
-      alert(message);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      setUploadedFiles(prev => ({
+      // Simulate progress (replace with real progress events if available)
+      const interval = setInterval(() => {
+        setUploadProgress(prev => ({
+          ...prev,
+          [fileName]: {
+            ...prev[fileName],
+            progress: Math.min(prev[fileName].progress + 0.1, 0.9)
+          }
+        }));
+      }, 200);
+  
+      await uploadFile(currentChatId, file);
+  
+      // Finalize progress
+      setUploadProgress(prev => ({
         ...prev,
-        [currentChatId]: null
+        [fileName]: { progress: 1, status: 'done' }
       }));
-      alert("File upload failed. Please try again.");
+      
+      clearInterval(interval);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      setUploadProgress(prev => ({
+        ...prev,
+        [fileName]: { progress: 0, status: 'error' }
+      }));
+      // Remove file from list after delay
+      setTimeout(() => {
+        setUploadedFiles(prev => ({
+          ...prev,
+          [currentChatId]: (prev[currentChatId] || []).filter(name => name !== fileName)
+        }));
+      }, 2000);
     } finally {
       event.target.value = '';
     }
@@ -199,21 +268,42 @@ const ChatInterface: React.FC = () => {
             <MessageBubble role="bot" content={<TypingIndicator />} />
           )}
         </div>
-        {currentChatId && uploadedFiles[currentChatId] && (
-          <div className="p-2 bg-gray-700 text-gray-300 flex items-center space-x-2 border-t border-gray-600">
-            <FaFileAlt size={18} />
-            <span>{uploadedFiles[currentChatId]}</span>
-            <button 
-              onClick={() => setUploadedFiles(prev => ({
-                ...prev,
-                [currentChatId!]: null
-              }))}  
-              className="text-red-500 hover:text-red-700"
-            >
-              <FaTimes size={16} />
-            </button>
-          </div>
-        )}
+        {currentChatId && (uploadedFiles[currentChatId] || []).map((fileName, index) => {
+          const progressData = uploadProgress[fileName] || { progress: 0, status: 'uploading' };
+          
+          return (
+            <div key={index} className="p-2 bg-gray-700 text-gray-300 flex items-center space-x-2 border-t border-gray-600">
+              <FaFileAlt size={18} />
+              <span className="flex-1">{fileName}</span>
+              
+              {progressData.status === 'error' ? (
+                <span className="text-red-500 text-sm">Upload Failed</span>
+              ) : (
+                <ProgressCircle 
+                  progress={progressData.progress} 
+                  isDone={progressData.status === 'done'}
+                />
+              )}
+              
+              <button 
+                onClick={() => {
+                  setUploadedFiles(prev => ({
+                    ...prev,
+                    [currentChatId]: (prev[currentChatId] || []).filter((_, i) => i !== index)
+                  }));
+                  setUploadProgress(prev => {
+                    const newState = { ...prev };
+                    delete newState[fileName];
+                    return newState;
+                  });
+                }}
+                className="text-red-500 hover:text-red-700 ml-2"
+              >
+                <FaTimes size={16} />
+              </button>
+            </div>
+          );
+        })}
         <div className="p-4 bg-gray-900 flex">
           <label className="mr-4 cursor-pointer">
             <span className="text-blue-500 hover:text-blue-600 text-3xl font-bold">+</span>
