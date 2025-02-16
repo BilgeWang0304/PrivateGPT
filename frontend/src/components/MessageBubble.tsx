@@ -2,6 +2,7 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { FaRegLightbulb } from "react-icons/fa";
+import { useTheme } from "./themeContext";
 
 interface MessageBubbleProps {
   role: "user" | "bot";
@@ -9,6 +10,8 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
+  const { isDarkMode } = useTheme();
+  
   if (content === null || content === undefined) {
     return null;
   }
@@ -32,14 +35,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
       <div
         className={`px-4 py-2 rounded-xl text-xl relative ${
           role === "user"
-            ? "bg-blue-500 bg-opacity-80 text-white max-w-3xl py-2"
-            : "bg-gray-700 bg-opacity-70 text-gray-200 max-w-3xl"
+            ? isDarkMode
+              ? "bg-blue-500 bg-opacity-90 text-white max-w-3xl"
+              : "bg-blue-500 text-white max-w-3xl"
+            : isDarkMode
+              ? "bg-gray-700 bg-opacity-60 text-gray-200 max-w-5xl"
+              : "bg-gray-300  text-gray-800 max-w-5xl"
         }`}
       >
         {thinkContent && (
-          <div className="mb-4 p-3 pl-6 border-l-4 border-gray-400 bg-gray-700 bg-opacity-50 text-gray-300 text-lg relative">
+          <div className={`mb-4 p-3 pl-6 border-l-4 text-lg relative 
+            ${isDarkMode ? "border-gray-400 bg-gray-700 bg-opacity-50 text-gray-300" : "border-gray-600 bg-gray-200 text-gray-800"}`}>
             <span className=" text-lg font-bold flex items-center space-x-2">
-              <FaRegLightbulb className="text-yellow-300 mr-2" size={20} />
+              <FaRegLightbulb className={`${isDarkMode ? "text-yellow-300" : "text-yellow-500"} mr-2`} size={20} />
               Thinking Phase
             </span>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>

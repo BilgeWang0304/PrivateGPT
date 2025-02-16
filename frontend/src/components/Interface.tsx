@@ -4,6 +4,7 @@ import MessageBubble from "./MessageBubble";
 import { sendMessage, sendMessageStream, startNewChat, uploadFile, fetchChatHistoryById, fetchChatHistory  } from "../api/chatAPI";
 import { TypingIndicator } from "./typingIndicator";
 import { FaFileAlt, FaTimes, FaCheck } from "react-icons/fa"; 
+import { useTheme } from "./themeContext";
 
 interface Message {
   role: "user" | "bot";
@@ -15,9 +16,6 @@ interface Chat {
   title: string;
 }
 
-interface ChatInterfaceState {
-  uploadedFiles: { [key: string]: string | null }; 
-}
 
 const ProgressCircle = ({ progress, isDone }: { progress: number; isDone: boolean }) => (
   <div className="relative w-6 h-6 ml-2">
@@ -51,6 +49,7 @@ const ProgressCircle = ({ progress, isDone }: { progress: number; isDone: boolea
 );
 
 const ChatInterface: React.FC = () => {
+  const { isDarkMode, toggleTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -62,13 +61,13 @@ const ChatInterface: React.FC = () => {
     const savedFiles = localStorage.getItem('uploadedFiles');
     return savedFiles ? JSON.parse(savedFiles) : {};
   });
-  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
   const [uploadProgress, setUploadProgress] = useState<{ 
     [key: string]: { 
       progress: number; 
       status: 'uploading' | 'done' | 'error' 
     } 
   }>({});
+
 
   useEffect(() => {
     loadChatHistory();
@@ -104,20 +103,19 @@ const ChatInterface: React.FC = () => {
       try {
         setIsTyping(true);
         
-        // Add a temporary bot response placeholder
         setMessages((prev) => [...prev, { role: "bot", content: "" }]);
 
         let fullResponse = "";
 
-        // **Use streaming for both normal and file-based queries**
+
         console.log(`Sending query ${uploadedFile ? "with file" : "without file"}...`);
         const responseStream = await sendMessageStream(currentChatId, input);
 
         for await (const chunk of responseStream) {
-            fullResponse += chunk; // Append chunks as they arrive
+            fullResponse += chunk; 
             console.log("Received chunk:", chunk);
 
-            // Update the last bot message in real-time
+
             setMessages((prev) =>
                 prev.map((msg, idx) =>
                     idx === prev.length - 1
@@ -127,14 +125,12 @@ const ChatInterface: React.FC = () => {
             );
         }
 
-        // Final update to the last bot message
         setMessages((prev) =>
             prev.map((msg, idx) =>
                 idx === prev.length - 1 ? { ...msg, content: fullResponse } : msg
             )
         );
 
-        // Ensure the chatbot correctly associates the chat session with the file
         if (!currentChatId) {
             const { chat_id } = await sendMessage(currentChatId, input);
             setCurrentChatId(chat_id);
@@ -170,7 +166,6 @@ const ChatInterface: React.FC = () => {
       return;
     }
   
-    // Immediately show file with loading state
     setUploadedFiles(prev => ({
       ...prev,
       [currentChatId]: [...(prev[currentChatId] || []), fileName]
@@ -182,7 +177,6 @@ const ChatInterface: React.FC = () => {
     }));
   
     try {
-      // Simulate progress (replace with real progress events if available)
       const interval = setInterval(() => {
         setUploadProgress(prev => ({
           ...prev,
@@ -195,7 +189,6 @@ const ChatInterface: React.FC = () => {
   
       await uploadFile(currentChatId, file);
   
-      // Finalize progress
       setUploadProgress(prev => ({
         ...prev,
         [fileName]: { progress: 1, status: 'done' }
@@ -208,7 +201,6 @@ const ChatInterface: React.FC = () => {
         ...prev,
         [fileName]: { progress: 0, status: 'error' }
       }));
-      // Remove file from list after delay
       setTimeout(() => {
         setUploadedFiles(prev => ({
           ...prev,
@@ -259,7 +251,7 @@ const ChatInterface: React.FC = () => {
         currentChatId={currentChatId}
       />
 
-      <div className="flex-1 flex flex-col  bg-gray-800 text-gray-100">
+      <div className={`flex-1 flex flex-col  ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-200 text-gray-800"}`}>
         <div className="flex-1 overflow-y-auto p-8">
         {messages.map((msg, index) => (
             <MessageBubble key={index} role={msg.role} content={msg.content} />
@@ -268,80 +260,104 @@ const ChatInterface: React.FC = () => {
             <MessageBubble role="bot" content={<TypingIndicator />} />
           )}
         </div>
-        {currentChatId && (uploadedFiles[currentChatId] || []).map((fileName, index) => {
-          const progressData = uploadProgress[fileName] || { progress: 0, status: 'uploading' };
-          
-          return (
-            <div key={index} className="p-2 bg-gray-700 text-gray-300 flex items-center space-x-2 border-t border-gray-600">
-              <FaFileAlt size={18} />
-              <span className="flex-1">{fileName}</span>
-              
-              {progressData.status === 'error' ? (
-                <span className="text-red-500 text-sm">Upload Failed</span>
-              ) : (
-                <ProgressCircle 
-                  progress={progressData.progress} 
-                  isDone={progressData.status === 'done'}
+        {/* Input Area */}
+        <div className={`p-4 pr-20 pl-10 pb-0 ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+          <div className="relative">
+            <textarea
+              className={`w-full p-4 pr-24 pl-16 ${isDarkMode ? "bg-gray-900 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-800"} rounded-lg border border-gray-700 resize-none shadow-lg`}
+              placeholder="Type a message..."
+              value={input}
+              rows={3}
+              style={{
+                minHeight: '6rem',  
+                maxHeight: '12rem', 
+                overflowY: 'auto'
+              }}
+              onChange={(e) => {
+                setInput(e.target.value);
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                const newHeight = Math.min(
+                  Math.max(target.scrollHeight, 96), 
+                  192 
+                );
+                target.style.height = `${newHeight}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            ></textarea>
+
+            {/* Left side buttons */}
+            <div className="absolute left-3 bottom-4 flex items-center gap-2">
+              <label className="cursor-pointer">
+                <span className="text-gray-400 hover:text-blue-500 transition-colors">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </span>
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="hidden"
                 />
-              )}
-              
-              <button 
-                onClick={() => {
-                  setUploadedFiles(prev => ({
-                    ...prev,
-                    [currentChatId]: (prev[currentChatId] || []).filter((_, i) => i !== index)
-                  }));
-                  setUploadProgress(prev => {
-                    const newState = { ...prev };
-                    delete newState[fileName];
-                    return newState;
-                  });
-                }}
-                className="text-red-500 hover:text-red-700 ml-2"
+              </label>
+            </div>
+
+            {/* Right side send button */}
+            <div className="absolute right-3 bottom-4">
+              <button
+                onClick={handleSendMessage}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                disabled={!input.trim()}
               >
-                <FaTimes size={16} />
+                Send
               </button>
             </div>
-          );
-        })}
-        <div className="p-4 bg-gray-900 flex">
-          <label className="mr-4 cursor-pointer">
-            <span className="text-blue-500 hover:text-blue-600 text-3xl font-bold">+</span>
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              style={{ display: "none" }}
-            />
-          </label>
-          <textarea
-            className="text-lg flex-1 p-2 bg-gray-800 text-gray-200 rounded-lg border border-gray-700 resize-none shadow-sm"
-            placeholder="Type a message..."
-            value={input}
-            rows={1}
-            onChange={(e) => {
-              setInput(e.target.value);
+          </div>
 
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = "auto"; 
-              target.style.height = `${target.scrollHeight}px`; 
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault(); 
-                handleSendMessage();
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = "auto";
-              }
-            }}
-          ></textarea>
-          <button
-            onClick={handleSendMessage}
-            className="ml-4 px-4 py-2 h-12 bg-blue-500 text-white text-lg rounded-lg hover:bg-blue-600"
-          >
-            Send
-          </button>
+          {/* Uploaded files list */}
+          {currentChatId && (uploadedFiles[currentChatId] || []).map((fileName, index) => {
+            const progressData = uploadProgress[fileName] || { progress: 0, status: 'uploading' };
+            
+            return (
+              <div key={index} className={`mt-2 p-2 ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-white text-gray-800"} flex items-center space-x-2 rounded-lg`}>
+                <FaFileAlt size={16} />
+                <span className="flex-1 text-sm">{fileName}</span>
+                
+                {progressData.status === 'error' ? (
+                  <span className="text-red-500 text-xs">Failed</span>
+                ) : (
+                  <ProgressCircle 
+                    progress={progressData.progress} 
+                    isDone={progressData.status === 'done'}
+                  />
+                )}
+                
+                <button 
+                  onClick={() => {
+                    setUploadedFiles(prev => ({
+                      ...prev,
+                      [currentChatId]: (prev[currentChatId] || []).filter((_, i) => i !== index)
+                    }));
+                    setUploadProgress(prev => {
+                      const newState = { ...prev };
+                      delete newState[fileName];
+                      return newState;
+                    });
+                  }}
+                  className="text-red-400 hover:text-red-500 ml-2"
+                >
+                  <FaTimes size={14} />
+                </button>
+              </div>
+            );
+          })}
         </div>
-        <p className="text-center bg-gray-900 text-gray-300 text-sm mb-2">
+        <p className={`text-center ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-200 text-gray-800"} text-sm mb-6`}>
           This Chatbot can make mistakes. Check important info.
         </p>
       </div>
