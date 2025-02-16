@@ -2,6 +2,7 @@
 
 🚀 A locally hosted AI-based chatbot with file analysis capabilities, built using FastAPI and React, supportted by Ollama.
 
+<img width="1077" alt="1" src="https://github.com/user-attachments/assets/4f118b3d-7e05-465e-8f72-7c31f8bfeb67" />
 
 ## Overview
 
@@ -31,7 +32,7 @@ Streamed content delivery for natural conversation flow
 
 Local file processing with LangChain integration
 
-PDF/TXT document analysis without cloud exposure
+Analysis of several types of documents without cloud exposure
 
 Context-aware responses using private knowledge bases
 
