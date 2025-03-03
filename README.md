@@ -121,4 +121,4 @@ process_executor = ThreadPoolExecutor(max_workers=3)
 
 ### Reminder
 
-Please only choose to use qwen or deepseek models when analysing arabic text.
+**Please only choose to use qwen or deepseek models when analysing arabic text.**
