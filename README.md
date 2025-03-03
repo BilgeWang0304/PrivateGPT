@@ -1,6 +1,6 @@
 ## PrivateGPT - Offline Chatbot for Secure Data Analysis
 
-🚀 A locally hosted AI-based chatbot with file analysis capabilities, built using FastAPI and React, supportted by Ollama.
+🚀 A locally hosted AI-based chatbot with file analysis capabilities, built using Python and React, supportted by Ollama.
 
 <img width="1077" alt="1" src="https://github.com/user-attachments/assets/4f118b3d-7e05-465e-8f72-7c31f8bfeb67" />
 
@@ -118,3 +118,7 @@ File "backend/routes/file_routes.py", line 16:
 # Increase the max_workers if your computer can run more threads smoothly at the same time
 process_executor = ThreadPoolExecutor(max_workers=3)
 ```
+
+### Reminder
+
+Please use llama3.2 or llama3.3 when analysing arabic text.
