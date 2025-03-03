@@ -286,8 +286,8 @@ const ChatInterface: React.FC = () => {
                 minHeight: '6rem',
                 maxHeight: '12rem',
                 overflowY: 'auto',
-                direction: isInputArabic ? 'rtl' : 'ltr', // Set text direction dynamically
-                textAlign: isInputArabic ? 'right' : 'left', // Set text alignment dynamically
+                direction: isInputArabic ? 'rtl' : 'ltr', 
+                textAlign: isInputArabic ? 'right' : 'left', 
               }}
               onChange={(e) => {
                 setInput(e.target.value);
