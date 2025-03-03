@@ -48,6 +48,8 @@ const ProgressCircle = ({ progress, isDone }: { progress: number; isDone: boolea
   </div>
 );
 
+
+
 const ChatInterface: React.FC = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,6 +70,16 @@ const ChatInterface: React.FC = () => {
     } 
   }>({});
 
+  const isArabic = (text: string): boolean => {
+    const arabicRegex = /[\u0600-\u06FF]/;
+    return arabicRegex.test(text);
+  }
+
+  const [isInputArabic, setIsInputArabic] = useState(false);
+
+  useEffect(() => {
+    setIsInputArabic(isArabic(input));
+  }, [input]);
 
   useEffect(() => {
     loadChatHistory();
@@ -264,22 +276,26 @@ const ChatInterface: React.FC = () => {
         <div className={`p-4 pr-20 pl-10 pb-0 ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
           <div className="relative">
             <textarea
-              className={`w-full p-4 pr-24 pl-16 ${isDarkMode ? "bg-gray-900 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-800"} rounded-lg border border-gray-700 resize-none shadow-lg`}
+              className={`w-full p-4 pr-24 pl-16 ${
+                isDarkMode ? "bg-gray-900 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-800"
+              } rounded-lg border border-gray-700 resize-none shadow-lg`}
               placeholder="Type a message..."
               value={input}
               rows={3}
               style={{
-                minHeight: '6rem',  
-                maxHeight: '12rem', 
-                overflowY: 'auto'
+                minHeight: '6rem',
+                maxHeight: '12rem',
+                overflowY: 'auto',
+                direction: isInputArabic ? 'rtl' : 'ltr', // Set text direction dynamically
+                textAlign: isInputArabic ? 'right' : 'left', // Set text alignment dynamically
               }}
               onChange={(e) => {
                 setInput(e.target.value);
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
                 const newHeight = Math.min(
-                  Math.max(target.scrollHeight, 96), 
-                  192 
+                  Math.max(target.scrollHeight, 96),
+                  192
                 );
                 target.style.height = `${newHeight}px`;
               }}

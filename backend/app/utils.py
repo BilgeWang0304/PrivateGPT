@@ -17,7 +17,7 @@ VECTOR_STORE_NAME = "simple-rag"
 EMBEDDING_MODEL = "nomic-embed-text"
 VECTOR_STORE_DIR = "./vector_store"
 
-def get_llm(model="qwen2.5:1.5b", temperature=0.5):
+def get_llm(model="deepseek-r1:1.5b", temperature=0.5):
     return OllamaLLM(model=model, temperature=temperature)
 llm = get_llm()
 def generate_chat_id():

@@ -9,6 +9,11 @@ interface MessageBubbleProps {
   content: string | React.ReactNode;
 }
 
+const isArabic = (text: string): boolean => {
+  const arabicRegex = /[\u0600-\u06FF]/;
+  return arabicRegex.test(text);
+}
+
 const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
   const { isDarkMode } = useTheme();
   
@@ -29,6 +34,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
       ? (content as string).replace(thinkMatch[0], "").trim()
       : content;
   }
+  const isArabicContent = isStringContent && isArabic(mainContent as string);
 
   return (
     <div className={`flex ${role === "user" ? "justify-end" : "justify-start"} mb-6`}>
@@ -45,7 +51,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
       >
         {thinkContent && (
           <div className={`mb-4 p-3 pl-6 border-l-4 text-lg relative 
-            ${isDarkMode ? "border-gray-400 bg-gray-700 bg-opacity-50 text-gray-300" : "border-gray-600 bg-gray-200 text-gray-800"}`}>
+                ${isDarkMode 
+                  ? "border-gray-400 bg-gray-700 bg-opacity-50 text-gray-300" 
+                  : "border-gray-600 bg-gray-200 text-gray-800"}`}
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+            >
             <span className=" text-lg font-bold flex items-center space-x-2">
               <FaRegLightbulb className={`${isDarkMode ? "text-yellow-300" : "text-yellow-500"} mr-2`} size={20} />
               Thinking Phase
@@ -60,15 +72,81 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content }) => {
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-2" {...props} />,
-              h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-2" {...props} />,
-              h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mb-2" {...props} />,
-              p: ({ node, ...props }) => <p className="mb-2 leading-relaxed" {...props} />,
-              strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
-              ul: ({ node, ...props }) => <ul className="list-disc list-inside ml-5 mb-2" {...props} />,
-              li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+              h1: ({ node, ...props }) => (
+                <h1
+                  className="text-2xl font-bold mb-2"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr", // Ensure headings respect RTL
+                  }}
+                  {...props}
+                />
+              ),
+              h2: ({ node, ...props }) => (
+                <h2
+                  className="text-xl font-bold mb-2"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
+              h3: ({ node, ...props }) => (
+                <h3
+                  className="text-lg font-semibold mb-2"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
+              p: ({ node, ...props }) => (
+                <p
+                  className="mb-2 leading-relaxed"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
+              strong: ({ node, ...props }) => (
+                <strong
+                  className="font-bold"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
+              ul: ({ node, ...props }) => (
+                <ul
+                  className={`list-disc ${
+                    isArabicContent ? "list-outside mr-5" : "list-inside ml-5"
+                  } mb-2`}
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
+              li: ({ node, ...props }) => (
+                <li
+                  className="mb-1"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
+              ),
               a: ({ node, ...props }) => (
-                <a className="text-blue-500 underline" target="_blank" rel="noopener noreferrer" {...props} />
+                <a
+                  className="text-blue-500 underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    direction: isArabicContent ? "rtl" : "ltr",
+                  }}
+                  {...props}
+                />
               ),
               br: () => <br />,
             }}
